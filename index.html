@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Chess Game</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      overflow: hidden;
+    }
+    #moves {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 10px;
+      max-height: 90vh;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="moves">Moves:</div>
+  <script type="module">
+    import * as THREE from './libs/three.module.js';
+    import { Chess } from './libs/chess.js';
+
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    let renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    camera.position.set(0, 150, 250);
+    camera.lookAt(0, 0, 0);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    light.position.set(100, 200, 100);
+    scene.add(light);
+
+    const tileSize = 25;
+    const offset = tileSize * 3.5;
+
+    // Create board
+    const board = new THREE.Group();
+    for (let x = 0; x < 8; x++) {
+      for (let z = 0; z < 8; z++) {
+        const color = (x + z) % 2 === 0 ? 0xffffff : 0x222222;
+        const tile = new THREE.Mesh(
+          new THREE.BoxGeometry(tileSize, 2, tileSize),
+          new THREE.MeshLambertMaterial({ color })
+        );
+        tile.position.set(x * tileSize - offset, 0, z * tileSize - offset);
+        board.add(tile);
+      }
+    }
+    scene.add(board);
+
+    const chess = new Chess();
+    let pieces = {};
+
+    function positionToCoords(pos) {
+      const file = pos.charCodeAt(0) - 'a'.charCodeAt(0);
+      const rank = 8 - parseInt(pos[1]);
+      return [
+        file * tileSize - offset,
+        5,
+        rank * tileSize - offset
+      ];
+    }
+
+    function createPiece(type, color, pos) {
+      const geometry = new THREE.CylinderGeometry(6, 10, 20, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: color === 'w' ? 0xffffff : 0x111111,
+        metalness: 0.3,
+        roughness: 0.5
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      const [x, y, z] = positionToCoords(pos);
+      mesh.position.set(x, y, z);
+      scene.add(mesh);
+      pieces[pos] = mesh;
+    }
+
+    function setupBoard() {
+      for (let key in pieces) scene.remove(pieces[key]);
+      pieces = {};
+      const boardState = chess.board();
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const piece = boardState[r][c];
+          if (piece) {
+            const pos = String.fromCharCode(97 + c) + (8 - r);
+            createPiece(piece.type, piece.color, pos);
+          }
+        }
+      }
+    }
+
+    function updateMovesList() {
+      const movesDiv = document.getElementById("moves");
+      const history = chess.history();
+      movesDiv.innerHTML = "Moves:<br>" + history.map((m, i) => `${i + 1}. ${m}`).join("<br>");
+    }
+
+    setupBoard();
+    updateMovesList();
+
+    window.addEventListener("keydown", (e) => {
+      // Example: press "M" to make a move
+      if (e.key === "m") {
+        const move = chess.move("e2e4");
+        if (move) {
+          setupBoard();
+          updateMovesList();
+        }
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
